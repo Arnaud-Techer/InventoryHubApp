@@ -1,0 +1,45 @@
+@using InventoryHubApp.Shared.Models;
+@using InventoryHubApp.Client.Services;
+@inject HttpClient Http
+@inject InventoryHubApp.Client.Services.IApiService ApiService
+
+@page "/fetchproducts"
+
+<h3>Products List</h3>
+
+<ul>
+    @if (products!=null)
+    {
+        foreach (Product product in products)
+        {
+            <li>@product.ProductName - $@product.Price</li>
+            <small>Categories:
+                @string.Join(", ", product.Categories.Select(category => category?.CategoryName ?? "Category unknow"))
+            </small>
+            <br />
+            <small>Suppliers: @string.Join(", ", product.Suppliers.Select(supplier => supplier?.SupplierName ?? "SUpplier unknow"))</small>
+        }
+    }
+    else
+    {
+        <li>Loading...</li>
+    }
+</ul>
+
+
+@code {
+    private Product[]? products;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            products = await ApiService.GetProductsAsync();
+
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error fetching products: {ex.Message}");
+            products = Array.Empty<Product>();
+        }
+    }
+}

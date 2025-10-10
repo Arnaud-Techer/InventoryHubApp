@@ -1,45 +1,194 @@
 @using InventoryHubApp.Shared.Models;
 @using InventoryHubApp.Client.Services;
-@inject HttpClient Http
+@using Client.Components;
 @inject InventoryHubApp.Client.Services.IApiService ApiService
 
 @page "/fetchproducts"
 
-<h3>Products List</h3>
+<div class="products-page">
+    <div class="page-header">
+        <h2 class="page-title">
+            <i class="fas fa-boxes"></i>
+            Products Inventory
+        </h2>
+        <div class="page-actions">
+            <button class="btn btn-success" @onclick="RefreshProducts">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+            <button class="btn btn-primary" @onclick="AddNewProduct">
+                <i class="fas fa-plus"></i>
+                Add Product
+            </button>
+        </div>
+    </div>
 
-<ul>
-    @if (products!=null)
+    @if (isLoading)
     {
-        foreach (Product product in products)
-        {
-            <li>@product.ProductName - $@product.Price</li>
-            <small>Categories:
-                @string.Join(", ", product.Categories.Select(category => category?.CategoryName ?? "Category unknow"))
-            </small>
-            <br />
-            <small>Suppliers: @string.Join(", ", product.Suppliers.Select(supplier => supplier?.SupplierName ?? "SUpplier unknow"))</small>
-        }
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading products...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="error-container">
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Error:</strong> @errorMessage
+            </div>
+            <button class="btn btn-outline-primary" @onclick="LoadProducts">
+                <i class="fas fa-retry"></i>
+                Try Again
+            </button>
+        </div>
+    }
+    else if (products?.Any() == true)
+    {
+        <div class="products-grid">
+            @foreach (Product product in products)
+            {
+                <ProductCard Product="product" 
+                             OnEdit="EditProduct" 
+                             OnDelete="DeleteProduct" />
+            }
+        </div>
+        
+        <div class="products-summary">
+            <p class="summary-text">
+                <i class="fas fa-info-circle"></i>
+                Showing @products.Length product(s) in inventory
+            </p>
+        </div>
     }
     else
     {
-        <li>Loading...</li>
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-box-open"></i>
+            </div>
+            <h3>No Products Found</h3>
+            <p>There are no products in the inventory yet.</p>
+            <button class="btn btn-primary" @onclick="AddNewProduct">
+                <i class="fas fa-plus"></i>
+                Add Your First Product
+            </button>
+        </div>
     }
-</ul>
+</div>
 
+<AddProductModal IsVisible="showAddModal" 
+                 OnClose="CloseAddModal" 
+                 OnProductAdded="HandleProductAdded" />
+
+<EditProductModal IsVisible="showEditModal" 
+                  ProductToEdit="selectedProduct"
+                  OnClose="CloseEditModal" 
+                  OnProductUpdated="HandleProductUpdated" />
+
+<DeleteProductModal IsVisible="showDeleteModal" 
+                    ProductToDelete="productToDelete"
+                    OnClose="CloseDeleteModal" 
+                    OnProductDeleted="HandleProductDeleted" />
 
 @code {
     private Product[]? products;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool showAddModal = false;
+    private bool showEditModal = false;
+    private bool showDeleteModal = false;
+    private Product? selectedProduct;
+    private Product? productToDelete;
+
     protected override async Task OnInitializedAsync()
     {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
         try
         {
             products = await ApiService.GetProductsAsync();
-
         }
         catch (Exception ex)
         {
+            errorMessage = ex.Message;
             Console.Error.WriteLine($"Error fetching products: {ex.Message}");
             products = Array.Empty<Product>();
         }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshProducts()
+    {
+        await LoadProducts();
+    }
+
+    private void AddNewProduct()
+    {
+        showAddModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseAddModal()
+    {
+        showAddModal = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleProductAdded(Product newProduct)
+    {
+        // Refresh the products list to include the new product
+        await LoadProducts();
+    }
+
+    private void EditProduct(Product product)
+    {
+        selectedProduct = product;
+        showEditModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseEditModal()
+    {
+        showEditModal = false;
+        selectedProduct = null;
+        StateHasChanged();
+    }
+
+    private async Task HandleProductUpdated(Product updatedProduct)
+    {
+        // Refresh the products list to show the updated product
+        await LoadProducts();
+    }
+
+    private void DeleteProduct(Product product)
+    {
+        productToDelete = product;
+        showDeleteModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        productToDelete = null;
+        StateHasChanged();
+    }
+
+    private async Task HandleProductDeleted(Product deletedProduct)
+    {
+        // Refresh the products list to remove the deleted product
+        await LoadProducts();
     }
 }

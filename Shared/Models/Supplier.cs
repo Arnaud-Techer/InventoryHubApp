@@ -9,7 +9,6 @@ public class Supplier
         public string? SupplierAddress { get; set; }
         public string? SupplierPhoneNumber { get; set; }
         
-        [JsonIgnore]
         public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 
         // Parameterless constructor for EF Core

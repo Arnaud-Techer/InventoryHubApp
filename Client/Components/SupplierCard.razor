@@ -1,0 +1,78 @@
+@using InventoryHubApp.Shared.Models
+
+<div class="supplier-card">
+    <div class="supplier-header">
+        <div class="supplier-info">
+            <h3 class="supplier-name">
+                <i class="fas fa-truck"></i>
+                @Supplier.SupplierName
+            </h3>
+            <div class="supplier-details">
+                <div class="detail-item">
+                    <i class="fas fa-envelope"></i>
+                    <span>@Supplier.SupplierEmail</span>
+                </div>
+                @if (!string.IsNullOrEmpty(Supplier.SupplierPhoneNumber))
+                {
+                    <div class="detail-item">
+                        <i class="fas fa-phone"></i>
+                        <span>@Supplier.SupplierPhoneNumber</span>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Supplier.SupplierAddress))
+                {
+                    <div class="detail-item">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>@Supplier.SupplierAddress</span>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="supplier-actions">
+            <button class="btn btn-edit" @onclick="() => OnEdit.InvokeAsync(Supplier)" title="Edit Supplier">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-delete" @onclick="() => OnDelete.InvokeAsync(Supplier)" title="Delete Supplier">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </div>
+
+    @if (Supplier.Products?.Any() == true)
+    {
+        <div class="supplier-products">
+            <h4 class="products-title">
+                <i class="fas fa-boxes"></i>
+                Products (@Supplier.Products.Count)
+            </h4>
+            <div class="products-list">
+                @foreach (var product in Supplier.Products.Take(3))
+                {
+                    <div class="product-item">
+                        <span class="product-name">@product.ProductName</span>
+                        <span class="product-price">$@product.Price.ToString("F2")</span>
+                    </div>
+                }
+                @if (Supplier.Products.Count > 3)
+                {
+                    <div class="product-item more">
+                        <span class="more-text">+@(Supplier.Products.Count - 3) more products</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="no-products">
+            <i class="fas fa-box-open"></i>
+            <span>No products associated</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Supplier Supplier { get; set; } = new();
+    [Parameter] public EventCallback<Supplier> OnEdit { get; set; }
+    [Parameter] public EventCallback<Supplier> OnDelete { get; set; }
+}

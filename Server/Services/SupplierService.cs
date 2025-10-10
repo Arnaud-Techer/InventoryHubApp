@@ -29,21 +29,65 @@ namespace InventoryHubApp.Server.Services
 
         public async Task<Supplier> CreateSupplierAsync(Supplier supplier)
         {
-            _context.Suppliers.Add(supplier);
+            // Create a new supplier without navigation properties
+            var newSupplier = new Supplier
+            {
+                SupplierName = supplier.SupplierName,
+                SupplierEmail = supplier.SupplierEmail,
+                SupplierPhoneNumber = supplier.SupplierPhoneNumber,
+                SupplierAddress = supplier.SupplierAddress
+            };
+
+            _context.Suppliers.Add(newSupplier);
             await _context.SaveChangesAsync();
-            return supplier;
+
+            // Now add the relationships with existing products
+            if (supplier.Products?.Any() == true)
+            {
+                var productIds = supplier.Products.Select(p => p.ProductId).ToList();
+                var existingProducts = await _context.Products
+                    .Where(p => productIds.Contains(p.ProductId))
+                    .ToListAsync();
+                
+                foreach (var product in existingProducts)
+                {
+                    newSupplier.Products.Add(product);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return newSupplier;
         }
 
         public async Task<Supplier?> UpdateSupplierAsync(int supplierId, Supplier supplier)
         {
-            var existingSupplier = await _context.Suppliers.FindAsync(supplierId);
+            var existingSupplier = await _context.Suppliers
+                .Include(s => s.Products)
+                .FirstOrDefaultAsync(s => s.SupplierId == supplierId);
+
             if (existingSupplier == null)
                 return null;
 
+            // Update basic properties
             existingSupplier.SupplierName = supplier.SupplierName;
             existingSupplier.SupplierEmail = supplier.SupplierEmail;
             existingSupplier.SupplierAddress = supplier.SupplierAddress;
             existingSupplier.SupplierPhoneNumber = supplier.SupplierPhoneNumber;
+
+            // Update products if provided
+            if (supplier.Products != null)
+            {
+                existingSupplier.Products.Clear();
+                var productIds = supplier.Products.Select(p => p.ProductId).ToList();
+                var existingProducts = await _context.Products
+                    .Where(p => productIds.Contains(p.ProductId))
+                    .ToListAsync();
+                
+                foreach (var product in existingProducts)
+                {
+                    existingSupplier.Products.Add(product);
+                }
+            }
 
             await _context.SaveChangesAsync();
             return existingSupplier;

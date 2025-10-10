@@ -9,6 +9,7 @@ namespace InventoryHubApp.Shared.Models
         public decimal Price { get; set; }
         public int Stock { get; set; }
         public virtual ICollection<Category> Categories { get; set; } = new List<Category>();
+        [JsonIgnore]
         public virtual ICollection<Supplier> Suppliers { get; set; } = new List<Supplier>();
 
         // Parameterless constructor for EF Core

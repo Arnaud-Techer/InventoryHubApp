@@ -23,43 +23,4 @@ namespace InventoryHubApp.Shared.Models
         }
     }
 
-    public class Category
-    {
-        public int CategoryId { get; set; }
-        public string? CategoryName { get; set; }
-        
-        [JsonIgnore]
-        public virtual ICollection<Product> Products { get; set; } = new List<Product>();
-
-        // Parameterless constructor for EF Core
-        public Category() { }
-
-        // Constructor for convenience
-        public Category(string categoryName)
-        {
-            CategoryName = categoryName;
-        }
-    }
-
-    public class Supplier
-    {
-        public int SupplierId { get; set; }
-        public string? SupplierName { get; set; }
-        public string? SupplierEmail { get; set; }
-        public string? SupplierAddress { get; set; }
-        public string? SupplierPhoneNumber { get; set; }
-        
-        [JsonIgnore]
-        public virtual ICollection<Product> Products { get; set; } = new List<Product>();
-
-        // Parameterless constructor for EF Core
-        public Supplier() { }
-
-        // Constructor for convenience
-        public Supplier(string supplierName, string supplierEmail)
-        {
-            SupplierName = supplierName;
-            SupplierEmail = supplierEmail;
-        }
-    }
 }

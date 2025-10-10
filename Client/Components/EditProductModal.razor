@@ -1,0 +1,297 @@
+@using InventoryHubApp.Shared.Models
+@using InventoryHubApp.Client.Services
+@using System.ComponentModel.DataAnnotations
+@inject IApiService ApiService
+
+<div class="modal-overlay @(IsVisible ? "show" : "")" @onclick="CloseModal">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-edit"></i>
+                Edit Product
+            </h3>
+            <button class="close-btn" @onclick="CloseModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            @if (ProductToEdit != null)
+            {
+                <EditForm Model="ProductModel" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="form-group">
+                        <label for="productName" class="form-label">
+                            <i class="fas fa-tag"></i>
+                            Product Name *
+                        </label>
+                        <InputText id="productName" 
+                                   @bind-Value="ProductModel.ProductName" 
+                                   class="form-control"
+                                   placeholder="Enter product name" />
+                        <ValidationMessage For="@(() => ProductModel.ProductName)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="price" class="form-label">
+                            <i class="fas fa-dollar-sign"></i>
+                            Price *
+                        </label>
+                        <InputNumber id="price" 
+                                     @bind-Value="ProductModel.Price" 
+                                     class="form-control"
+                                     placeholder="0.00" 
+                                     step="0.01" />
+                        <ValidationMessage For="@(() => ProductModel.Price)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stock" class="form-label">
+                            <i class="fas fa-boxes"></i>
+                            Stock Quantity *
+                        </label>
+                        <InputNumber id="stock" 
+                                     @bind-Value="ProductModel.Stock" 
+                                     class="form-control"
+                                     placeholder="0" />
+                        <ValidationMessage For="@(() => ProductModel.Stock)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="categories" class="form-label">
+                            <i class="fas fa-list"></i>
+                            Categories *
+                        </label>
+                        <div class="checkbox-group">
+                            @if (Categories?.Any() == true)
+                            {
+                                @foreach (var category in Categories)
+                                {
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" 
+                                               id="category_@category.CategoryId"
+                                               value="@category.CategoryId"
+                                               checked="@IsCategorySelected(category)"
+                                               @onchange="@((ChangeEventArgs e) => ToggleCategory(category, (bool)e.Value!))" />
+                                        <label for="category_@category.CategoryId" class="checkbox-label">
+                                            @category.CategoryName
+                                        </label>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="no-data">No categories available</p>
+                            }
+                        </div>
+                        <ValidationMessage For="@(() => ProductModel.SelectedCategories)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="suppliers" class="form-label">
+                            <i class="fas fa-truck"></i>
+                            Suppliers *
+                        </label>
+                        <div class="checkbox-group">
+                            @if (Suppliers?.Any() == true)
+                            {
+                                @foreach (var supplier in Suppliers)
+                                {
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" 
+                                               id="supplier_@supplier.SupplierId"
+                                               value="@supplier.SupplierId"
+                                               checked="@IsSupplierSelected(supplier)"
+                                               @onchange="@((ChangeEventArgs e) => ToggleSupplier(supplier, (bool)e.Value!))" />
+                                        <label for="supplier_@supplier.SupplierId" class="checkbox-label">
+                                            @supplier.SupplierName
+                                        </label>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="no-data">No suppliers available</p>
+                            }
+                        </div>
+                        <ValidationMessage For="@(() => ProductModel.SelectedSuppliers)" class="validation-message" />
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                            <i class="fas fa-times"></i>
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@IsSubmitting">
+                            @if (IsSubmitting)
+                            {
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Updating...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save"></i>
+                                <span>Update Product</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p>Loading product data...</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public Product? ProductToEdit { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<Product> OnProductUpdated { get; set; }
+
+    private EditProductModel ProductModel = new();
+    private Category[]? Categories;
+    private Supplier[]? Suppliers;
+    private bool IsSubmitting = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible && ProductToEdit != null)
+        {
+            await LoadData();
+            PopulateForm();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            Categories = await ApiService.GetCategoriesAsync();
+            Suppliers = await ApiService.GetSuppliersAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading data: {ex.Message}");
+        }
+    }
+
+    private void PopulateForm()
+    {
+        if (ProductToEdit != null)
+        {
+            ProductModel = new EditProductModel
+            {
+                ProductId = ProductToEdit.ProductId,
+                ProductName = ProductToEdit.ProductName ?? string.Empty,
+                Price = ProductToEdit.Price,
+                Stock = ProductToEdit.Stock,
+                SelectedCategories = ProductToEdit.Categories?.ToHashSet() ?? new HashSet<Category>(),
+                SelectedSuppliers = ProductToEdit.Suppliers?.ToHashSet() ?? new HashSet<Supplier>()
+            };
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        IsSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var product = new Product
+            {
+                ProductId = ProductModel.ProductId,
+                ProductName = ProductModel.ProductName,
+                Price = ProductModel.Price,
+                Stock = ProductModel.Stock,
+                Categories = ProductModel.SelectedCategories.ToList(),
+                Suppliers = ProductModel.SelectedSuppliers.ToList()
+            };
+
+            var updatedProduct = await ApiService.UpdateProductAsync(ProductModel.ProductId, product);
+            if (updatedProduct != null)
+            {
+                await OnProductUpdated.InvokeAsync(updatedProduct);
+                await CloseModal();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating product: {ex.Message}");
+        }
+        finally
+        {
+            IsSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private bool IsCategorySelected(Category category)
+    {
+        return ProductModel.SelectedCategories.Any(c => c.CategoryId == category.CategoryId);
+    }
+
+    private bool IsSupplierSelected(Supplier supplier)
+    {
+        return ProductModel.SelectedSuppliers.Any(s => s.SupplierId == supplier.SupplierId);
+    }
+
+    private void ToggleCategory(Category category, bool isSelected)
+    {
+        if (isSelected)
+        {
+            ProductModel.SelectedCategories.Add(category);
+        }
+        else
+        {
+            ProductModel.SelectedCategories.RemoveWhere(c => c.CategoryId == category.CategoryId);
+        }
+    }
+
+    private void ToggleSupplier(Supplier supplier, bool isSelected)
+    {
+        if (isSelected)
+        {
+            ProductModel.SelectedSuppliers.Add(supplier);
+        }
+        else
+        {
+            ProductModel.SelectedSuppliers.RemoveWhere(s => s.SupplierId == supplier.SupplierId);
+        }
+    }
+
+    public class EditProductModel
+    {
+        public int ProductId { get; set; }
+
+        [Required(ErrorMessage = "Product name is required")]
+        [StringLength(200, ErrorMessage = "Product name cannot exceed 200 characters")]
+        public string ProductName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Price is required")]
+        [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than 0")]
+        public decimal Price { get; set; }
+
+        [Required(ErrorMessage = "Stock quantity is required")]
+        [Range(0, int.MaxValue, ErrorMessage = "Stock quantity cannot be negative")]
+        public int Stock { get; set; }
+
+        [Required(ErrorMessage = "At least one category must be selected")]
+        public HashSet<Category> SelectedCategories { get; set; } = new();
+
+        [Required(ErrorMessage = "At least one supplier must be selected")]
+        public HashSet<Supplier> SelectedSuppliers { get; set; } = new();
+    }
+}

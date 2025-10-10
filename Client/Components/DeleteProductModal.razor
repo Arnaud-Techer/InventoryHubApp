@@ -1,0 +1,150 @@
+@using InventoryHubApp.Shared.Models
+@using InventoryHubApp.Client.Services
+@inject IApiService ApiService
+
+<div class="modal-overlay @(IsVisible ? "show" : "")" @onclick="CloseModal">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                Confirm Deletion
+            </h3>
+            <button class="close-btn" @onclick="CloseModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            @if (ProductToDelete != null)
+            {
+                <div class="warning-section">
+                    <div class="warning-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="warning-content">
+                        <h4>Are you sure you want to delete this product?</h4>
+                        <p class="warning-text">
+                            This action cannot be undone. The product will be permanently removed from the system.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="product-info">
+                    <h5>Product Details:</h5>
+                    <div class="product-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Name:</span>
+                            <span class="detail-value">@ProductToDelete.ProductName</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Price:</span>
+                            <span class="detail-value">$@ProductToDelete.Price.ToString("F2")</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Stock:</span>
+                            <span class="detail-value">@ProductToDelete.Stock units</span>
+                        </div>
+                        @if (ProductToDelete.Categories?.Any() == true)
+                        {
+                            <div class="detail-item">
+                                <span class="detail-label">Categories:</span>
+                                <span class="detail-value">
+                                    @string.Join(", ", ProductToDelete.Categories.Select(c => c.CategoryName))
+                                </span>
+                            </div>
+                        }
+                        @if (ProductToDelete.Suppliers?.Any() == true)
+                        {
+                            <div class="detail-item">
+                                <span class="detail-label">Suppliers:</span>
+                                <span class="detail-value">
+                                    @string.Join(", ", ProductToDelete.Suppliers.Select(s => s.SupplierName))
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal" disabled="@IsDeleting">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete" disabled="@IsDeleting">
+                        @if (IsDeleting)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Deleting...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-trash"></i>
+                            <span>Delete Product</span>
+                        }
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p>Loading product data...</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public Product? ProductToDelete { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<Product> OnProductDeleted { get; set; }
+
+    private bool IsDeleting = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible)
+        {
+            IsDeleting = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (ProductToDelete == null) return;
+
+        IsDeleting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.DeleteProductAsync(ProductToDelete.ProductId);
+            if (success)
+            {
+                await OnProductDeleted.InvokeAsync(ProductToDelete);
+                await CloseModal();
+            }
+            else
+            {
+                // Handle deletion failure
+                Console.Error.WriteLine($"Failed to delete product: {ProductToDelete.ProductName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error deleting product: {ex.Message}");
+        }
+        finally
+        {
+            IsDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

@@ -20,7 +20,7 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowBlazorClient", policy => policy.WithOrigins("http://localhost:5014").AllowAnyHeader().AllowAnyMethod());
+    options.AddPolicy("AllowBlazorClient", policy => policy.WithOrigins("http://localhost:5138").AllowAnyHeader().AllowAnyMethod());
 });
 
 var app = builder.Build();
@@ -32,7 +32,7 @@ using (var scope = app.Services.CreateScope())
     context.Database.EnsureCreated();
     
     // Seed many-to-many relationships if they don't exist
-    await SeedManyToManyRelationships(context);
+    // await SeedManyToManyRelationships(context);
 }
 
 // Configure the HTTP request pipeline

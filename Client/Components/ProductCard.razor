@@ -1,0 +1,70 @@
+@using InventoryHubApp.Shared.Models
+@namespace Client.Components
+
+<div class="product-card">
+    <div class="product-header">
+        <h5 class="product-name">@Product.ProductName</h5>
+        <span class="product-price">$@Product.Price.ToString(format: "F2")</span>
+    </div>
+    
+    <div class="product-details">
+        <div class="stock-info">
+            <span class="stock-label">Stock:</span>
+            <span class="stock-value @GetStockClass()">@Product.Stock</span>
+        </div>
+        
+        @if (Product.Categories?.Any() == true)
+        {
+            <div class="categories">
+                <span class="categories-label">Categories:</span>
+                <div class="category-tags">
+                    @foreach (Category category in Product.Categories)
+                    {
+                        <span class="category-tag">@category.CategoryName</span>
+                    }
+                </div>
+            </div>
+        }
+        
+        @if (Product.Suppliers?.Any() == true)
+        {
+            <div class="suppliers">
+                <span class="suppliers-label">Suppliers:</span>
+                <div class="supplier-list">
+                    @foreach (Supplier supplier in Product.Suppliers)
+                    {
+                        <div class="supplier-item">
+                            <span class="supplier-name">@supplier.SupplierName</span>
+                            <small class="supplier-email">@supplier.SupplierEmail</small>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+    
+    <div class="product-actions">
+        <button class="btn btn-primary btn-sm" @onclick="() => OnEdit.InvokeAsync(Product)">
+            <i class="fas fa-edit"></i> Edit
+        </button>
+        <button class="btn btn-outline-danger btn-sm" @onclick="() => OnDelete.InvokeAsync(Product)">
+            <i class="fas fa-trash"></i> Delete
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Product Product { get; set; } = new Product();
+    [Parameter] public EventCallback<Product> OnEdit { get; set; }
+    [Parameter] public EventCallback<Product> OnDelete { get; set; }
+
+    private string GetStockClass()
+    {
+        return Product.Stock switch
+        {
+            <= 5 => "stock-low",
+            <= 10 => "stock-medium",
+            _ => "stock-high"
+        };
+    }
+}

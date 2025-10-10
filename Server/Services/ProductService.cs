@@ -31,9 +31,46 @@ namespace InventoryHubApp.Server.Services
 
         public async Task<Product> CreateProductAsync(Product product)
         {
-            _context.Products.Add(product);
+            // Create a new product without navigation properties
+            var newProduct = new Product
+            {
+                ProductName = product.ProductName,
+                Price = product.Price,
+                Stock = product.Stock
+            };
+
+            _context.Products.Add(newProduct);
             await _context.SaveChangesAsync();
-            return product;
+
+            // Now add the relationships with existing categories and suppliers
+            if (product.Categories?.Any() == true)
+            {
+                var categoryIds = product.Categories.Select(c => c.CategoryId).ToList();
+                var existingCategories = await _context.Categories
+                    .Where(c => categoryIds.Contains(c.CategoryId))
+                    .ToListAsync();
+                
+                foreach (var category in existingCategories)
+                {
+                    newProduct.Categories.Add(category);
+                }
+            }
+
+            if (product.Suppliers?.Any() == true)
+            {
+                var supplierIds = product.Suppliers.Select(s => s.SupplierId).ToList();
+                var existingSuppliers = await _context.Suppliers
+                    .Where(s => supplierIds.Contains(s.SupplierId))
+                    .ToListAsync();
+                
+                foreach (var supplier in existingSuppliers)
+                {
+                    newProduct.Suppliers.Add(supplier);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return newProduct;
         }
 
         public async Task<Product?> UpdateProductAsync(int productId, Product product)
@@ -46,6 +83,7 @@ namespace InventoryHubApp.Server.Services
             if (existingProduct == null)
                 return null;
 
+            // Update basic properties
             existingProduct.ProductName = product.ProductName;
             existingProduct.Price = product.Price;
             existingProduct.Stock = product.Stock;
@@ -54,13 +92,14 @@ namespace InventoryHubApp.Server.Services
             if (product.Categories != null && product.Categories.Any())
             {
                 existingProduct.Categories.Clear();
-                foreach (var category in product.Categories)
+                var categoryIds = product.Categories.Select(c => c.CategoryId).ToList();
+                var existingCategories = await _context.Categories
+                    .Where(c => categoryIds.Contains(c.CategoryId))
+                    .ToListAsync();
+                
+                foreach (var category in existingCategories)
                 {
-                    var existingCategory = await _context.Categories.FindAsync(category.CategoryId);
-                    if (existingCategory != null)
-                    {
-                        existingProduct.Categories.Add(existingCategory);
-                    }
+                    existingProduct.Categories.Add(category);
                 }
             }
 
@@ -68,13 +107,14 @@ namespace InventoryHubApp.Server.Services
             if (product.Suppliers != null && product.Suppliers.Any())
             {
                 existingProduct.Suppliers.Clear();
-                foreach (var supplier in product.Suppliers)
+                var supplierIds = product.Suppliers.Select(s => s.SupplierId).ToList();
+                var existingSuppliers = await _context.Suppliers
+                    .Where(s => supplierIds.Contains(s.SupplierId))
+                    .ToListAsync();
+                
+                foreach (var supplier in existingSuppliers)
                 {
-                    var existingSupplier = await _context.Suppliers.FindAsync(supplier.SupplierId);
-                    if (existingSupplier != null)
-                    {
-                        existingProduct.Suppliers.Add(existingSupplier);
-                    }
+                    existingProduct.Suppliers.Add(supplier);
                 }
             }
 

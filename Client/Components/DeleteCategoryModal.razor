@@ -1,0 +1,164 @@
+@using InventoryHubApp.Shared.Models
+@using InventoryHubApp.Client.Services
+@inject IApiService ApiService
+
+<div class="modal-overlay @(IsVisible ? "show" : "")" @onclick="CloseModal">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                Delete Category
+            </h3>
+            <button class="close-btn" @onclick="CloseModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            <div class="warning-section">
+                <div class="warning-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="warning-content">
+                    <h4>Select a category to delete</h4>
+                    <p class="warning-text">
+                        This action cannot be undone. The category will be permanently removed from the system.
+                    </p>
+                </div>
+            </div>
+
+            @if (CategorySummaries?.Any() == true)
+            {
+                <div class="category-selection">
+                    <label class="form-label">
+                        <i class="fas fa-list"></i>
+                        Choose Category to Delete
+                    </label>
+                    <div class="category-list">
+                        @foreach (var summary in CategorySummaries)
+                        {
+                            <div class="category-item @(selectedCategory?.CategoryId == summary.CategoryId ? "selected" : "")" 
+                                 @onclick="() => SelectCategory(summary)">
+                                <div class="category-info">
+                                    <span class="category-name">@summary.CategoryName</span>
+                                    <span class="category-count">@summary.ProductCount products</span>
+                                </div>
+                                @if (selectedCategory?.CategoryId == summary.CategoryId)
+                                {
+                                    <i class="fas fa-check-circle selected-icon"></i>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete" disabled="@(selectedCategory == null || IsDeleting)">
+                        @if (IsDeleting)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Deleting...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-trash"></i>
+                            <span>Delete Category</span>
+                        }
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="no-categories">
+                    <i class="fas fa-list"></i>
+                    <p>No categories available to delete</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                        <i class="fas fa-times"></i>
+                        Close
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<CategorySummary> OnCategoryDeleted { get; set; }
+
+    private CategorySummary[]? CategorySummaries;
+    private CategorySummary? selectedCategory;
+    private bool IsDeleting = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible)
+        {
+            await LoadCategories();
+            selectedCategory = null;
+            IsDeleting = false;
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            CategorySummaries = await ApiService.GetCategorySummariesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading categories: {ex.Message}");
+        }
+    }
+
+    private void SelectCategory(CategorySummary category)
+    {
+        selectedCategory = category;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (selectedCategory == null) return;
+
+        IsDeleting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.DeleteCategoryAsync(selectedCategory.CategoryId);
+            if (success)
+            {
+                await OnCategoryDeleted.InvokeAsync(selectedCategory);
+                await CloseModal();
+            }
+            else
+            {
+                // Handle deletion failure
+                Console.Error.WriteLine($"Failed to delete category: {selectedCategory.CategoryName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error deleting category: {ex.Message}");
+        }
+        finally
+        {
+            IsDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

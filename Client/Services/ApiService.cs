@@ -16,6 +16,9 @@ public interface IApiService
     public Task<Product?> UpdateProductAsync(int id, Product product);
     public Task<bool> DeleteProductAsync(int id);
     public Task<Category[]?> GetCategoriesAsync();
+    public Task<CategorySummary[]?> GetCategorySummariesAsync();
+    public Task<Category?> CreateCategoryAsync(Category category);
+    public Task<bool> DeleteCategoryAsync(int id);
     public Task<Supplier[]?> GetSuppliersAsync();
     public Task<Supplier?> CreateSupplierAsync(Supplier supplier);
     public Task<Supplier?> UpdateSupplierAsync(int id, Supplier supplier);
@@ -85,6 +88,48 @@ public class ApiService : IApiService
         catch (HttpRequestException ex)
         {
             throw new Exception($"Failed to fetch categories. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<CategorySummary[]?> GetCategorySummariesAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<CategorySummary[]>("/api/category/with-counts");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to fetch category summaries. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<Category?> CreateCategoryAsync(Category category)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/category", category);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<Category>();
+            }
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to create category. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<bool> DeleteCategoryAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"/api/category/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to delete category. Error: {ex.Message}");
         }
     }
 

@@ -1,0 +1,134 @@
+@using InventoryHubApp.Shared.Models
+@using InventoryHubApp.Client.Services
+@using System.ComponentModel.DataAnnotations
+@inject IApiService ApiService
+
+<div class="modal-overlay @(IsVisible ? "show" : "")" @onclick="CloseModal">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-plus-circle"></i>
+                Add New Category
+            </h3>
+            <button class="close-btn" @onclick="CloseModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            <EditForm Model="CategoryModel" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-list"></i>
+                        Category Name *
+                    </label>
+                    <InputText @bind-Value="CategoryModel.CategoryName"
+                               class="form-control"
+                               placeholder="Enter category name" />
+                    <ValidationMessage For="@(() => CategoryModel.CategoryName)" class="validation-message" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        @ErrorMessage
+                    </div>
+                }
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" disabled="@IsSubmitting">
+                        @if (IsSubmitting)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Adding...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-plus"></i>
+                            <span>Add Category</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<Category> OnCategoryAdded { get; set; }
+
+    private AddCategoryModel CategoryModel = new();
+    private bool IsSubmitting = false;
+    private string? ErrorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible)
+        {
+            ResetForm();
+        }
+    }
+
+    private void ResetForm()
+    {
+        CategoryModel = new AddCategoryModel();
+        IsSubmitting = false;
+        ErrorMessage = null;
+    }
+
+    private async Task HandleSubmit()
+    {
+        IsSubmitting = true;
+        ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var category = new Category
+            {
+                CategoryName = CategoryModel.CategoryName
+            };
+
+            var createdCategory = await ApiService.CreateCategoryAsync(category);
+            if (createdCategory != null)
+            {
+                await OnCategoryAdded.InvokeAsync(createdCategory);
+                await CloseModal();
+            }
+            else
+            {
+                ErrorMessage = "A category with this name already exists. Please choose a different name.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    public class AddCategoryModel
+    {
+        [Required(ErrorMessage = "Category name is required")]
+        [StringLength(100, ErrorMessage = "Category name cannot exceed 100 characters")]
+        public string CategoryName { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,263 @@
+@using InventoryHubApp.Shared.Models
+@using InventoryHubApp.Client.Services
+@using System.ComponentModel.DataAnnotations
+@inject IApiService ApiService
+
+<div class="modal-overlay @(IsVisible ? "show" : "")" @onclick="CloseModal">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-edit"></i>
+                Edit Supplier
+            </h3>
+            <button class="close-btn" @onclick="CloseModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            @if (SupplierToEdit != null)
+            {
+                <EditForm Model="SupplierModel" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="form-group">
+                        <label for="supplierName" class="form-label">
+                            <i class="fas fa-truck"></i>
+                            Supplier Name *
+                        </label>
+                        <InputText id="supplierName" 
+                                   @bind-Value="SupplierModel.SupplierName" 
+                                   class="form-control"
+                                   placeholder="Enter supplier name" />
+                        <ValidationMessage For="@(() => SupplierModel.SupplierName)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="supplierEmail" class="form-label">
+                            <i class="fas fa-envelope"></i>
+                            Email Address *
+                        </label>
+                        <InputText id="supplierEmail" 
+                                   @bind-Value="SupplierModel.SupplierEmail" 
+                                   class="form-control"
+                                   placeholder="supplier@example.com"
+                                   type="email" />
+                        <ValidationMessage For="@(() => SupplierModel.SupplierEmail)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="supplierPhone" class="form-label">
+                            <i class="fas fa-phone"></i>
+                            Phone Number
+                        </label>
+                        <InputText id="supplierPhone" 
+                                   @bind-Value="SupplierModel.SupplierPhoneNumber" 
+                                   class="form-control"
+                                   placeholder="+1 (555) 123-4567" />
+                        <ValidationMessage For="@(() => SupplierModel.SupplierPhoneNumber)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="supplierAddress" class="form-label">
+                            <i class="fas fa-map-marker-alt"></i>
+                            Address
+                        </label>
+                        <InputTextArea id="supplierAddress" 
+                                       @bind-Value="SupplierModel.SupplierAddress" 
+                                       class="form-control"
+                                       placeholder="Enter supplier address"
+                                       rows="3" />
+                        <ValidationMessage For="@(() => SupplierModel.SupplierAddress)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="products" class="form-label">
+                            <i class="fas fa-boxes"></i>
+                            Associated Products
+                        </label>
+                        <div class="checkbox-group">
+                            @if (Products?.Any() == true)
+                            {
+                                @foreach (var product in Products)
+                                {
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" 
+                                               id="product_@product.ProductId"
+                                               value="@product.ProductId"
+                                               checked="@IsProductSelected(product)"
+                                               @onchange="@((ChangeEventArgs e) => ToggleProduct(product, (bool)e.Value!))" />
+                                        <label for="product_@product.ProductId" class="checkbox-label">
+                                            <div class="product-info">
+                                                <span class="product-name">@product.ProductName</span>
+                                                <span class="product-details">$@product.Price.ToString("F2") • Stock: @product.Stock</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="no-data">No products available</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                            <i class="fas fa-times"></i>
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@IsSubmitting">
+                            @if (IsSubmitting)
+                            {
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Updating...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save"></i>
+                                <span>Update Supplier</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p>Loading supplier data...</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public Supplier? SupplierToEdit { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<Supplier> OnSupplierUpdated { get; set; }
+
+    private EditSupplierModel SupplierModel = new();
+    private Product[]? Products;
+    private bool IsSubmitting = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible && SupplierToEdit != null)
+        {
+            await LoadData();
+            PopulateForm();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            Products = await ApiService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading data: {ex.Message}");
+        }
+    }
+
+    private void PopulateForm()
+    {
+        if (SupplierToEdit != null)
+        {
+            SupplierModel = new EditSupplierModel
+            {
+                SupplierId = SupplierToEdit.SupplierId,
+                SupplierName = SupplierToEdit.SupplierName ?? string.Empty,
+                SupplierEmail = SupplierToEdit.SupplierEmail ?? string.Empty,
+                SupplierPhoneNumber = SupplierToEdit.SupplierPhoneNumber,
+                SupplierAddress = SupplierToEdit.SupplierAddress,
+                SelectedProducts = SupplierToEdit.Products?.ToHashSet() ?? new HashSet<Product>()
+            };
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        IsSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var supplier = new Supplier
+            {
+                SupplierId = SupplierModel.SupplierId,
+                SupplierName = SupplierModel.SupplierName,
+                SupplierEmail = SupplierModel.SupplierEmail,
+                SupplierPhoneNumber = SupplierModel.SupplierPhoneNumber,
+                SupplierAddress = SupplierModel.SupplierAddress,
+                Products = SupplierModel.SelectedProducts.ToList()
+            };
+
+            var updatedSupplier = await ApiService.UpdateSupplierAsync(SupplierModel.SupplierId, supplier);
+            if (updatedSupplier != null)
+            {
+                await OnSupplierUpdated.InvokeAsync(updatedSupplier);
+                await CloseModal();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating supplier: {ex.Message}");
+        }
+        finally
+        {
+            IsSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private bool IsProductSelected(Product product)
+    {
+        return SupplierModel.SelectedProducts.Any(p => p.ProductId == product.ProductId);
+    }
+
+    private void ToggleProduct(Product product, bool isSelected)
+    {
+        if (isSelected)
+        {
+            SupplierModel.SelectedProducts.Add(product);
+        }
+        else
+        {
+            SupplierModel.SelectedProducts.RemoveWhere(p => p.ProductId == product.ProductId);
+        }
+    }
+
+    public class EditSupplierModel
+    {
+        public int SupplierId { get; set; }
+
+        [Required(ErrorMessage = "Supplier name is required")]
+        [StringLength(200, ErrorMessage = "Supplier name cannot exceed 200 characters")]
+        public string SupplierName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email address is required")]
+        [EmailAddress(ErrorMessage = "Please enter a valid email address")]
+        [StringLength(255, ErrorMessage = "Email address cannot exceed 255 characters")]
+        public string SupplierEmail { get; set; } = string.Empty;
+
+        [Phone(ErrorMessage = "Please enter a valid phone number")]
+        [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
+        public string? SupplierPhoneNumber { get; set; }
+
+        [StringLength(500, ErrorMessage = "Address cannot exceed 500 characters")]
+        public string? SupplierAddress { get; set; }
+
+        public HashSet<Product> SelectedProducts { get; set; } = new();
+    }
+}

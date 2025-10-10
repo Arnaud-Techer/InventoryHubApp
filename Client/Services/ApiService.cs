@@ -17,6 +17,8 @@ public interface IApiService
     public Task<bool> DeleteProductAsync(int id);
     public Task<Category[]?> GetCategoriesAsync();
     public Task<Supplier[]?> GetSuppliersAsync();
+    public Task<Supplier?> CreateSupplierAsync(Supplier supplier);
+    public Task<Supplier?> UpdateSupplierAsync(int id, Supplier supplier);
 }
 
 public class ApiService : IApiService
@@ -95,6 +97,40 @@ public class ApiService : IApiService
         catch (HttpRequestException ex)
         {
             throw new Exception($"Failed to fetch suppliers. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<Supplier?> CreateSupplierAsync(Supplier supplier)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/supplier", supplier);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<Supplier>();
+            }
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to create supplier. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<Supplier?> UpdateSupplierAsync(int id, Supplier supplier)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"/api/supplier/{id}", supplier);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<Supplier>();
+            }
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to update supplier. Error: {ex.Message}");
         }
     }
 }

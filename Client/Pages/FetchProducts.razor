@@ -12,6 +12,11 @@
             Products Inventory
         </h2>
         <div class="page-actions">
+            <PaginationComponent CurrentPage="currentPage" 
+                                TotalPages="totalPages" 
+                                HasPreviousPage="hasPreviousPage" 
+                                HasNextPage="hasNextPage" 
+                                OnPageChanged="LoadPage" />
             <button class="btn btn-success" @onclick="RefreshProducts">
                 <i class="fas fa-sync-alt"></i>
                 Refresh
@@ -131,13 +136,20 @@
     private bool showCategoryDropdown = false;
     private Product? selectedProduct;
     private Product? productToDelete;
+    
+    // Pagination properties
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private bool hasPreviousPage = false;
+    private bool hasNextPage = false;
+    private const int pageSize = 6;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProducts();
+        await LoadPage(1);
     }
 
-    private async Task LoadProducts()
+    private async Task LoadPage(int pageNumber)
     {
         isLoading = true;
         errorMessage = null;
@@ -145,7 +157,19 @@
 
         try
         {
-            products = await ApiService.GetProductsAsync();
+            var paginationResponse = await ApiService.GetProductsPaginatedAsync(pageNumber, pageSize);
+            if (paginationResponse != null)
+            {
+                products = paginationResponse.Items;
+                currentPage = paginationResponse.PageNumber;
+                totalPages = paginationResponse.TotalPages;
+                hasPreviousPage = paginationResponse.HasPreviousPage;
+                hasNextPage = paginationResponse.HasNextPage;
+            }
+            else
+            {
+                products = Array.Empty<Product>();
+            }
         }
         catch (Exception ex)
         {
@@ -158,6 +182,11 @@
             isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task LoadProducts()
+    {
+        await LoadPage(1);
     }
 
     private async Task RefreshProducts()
@@ -180,7 +209,7 @@
     private async Task HandleProductAdded(Product newProduct)
     {
         // Refresh the products list to include the new product
-        await LoadProducts();
+        await LoadPage(currentPage);
     }
 
     private void EditProduct(Product product)
@@ -200,7 +229,7 @@
     private async Task HandleProductUpdated(Product updatedProduct)
     {
         // Refresh the products list to show the updated product
-        await LoadProducts();
+        await LoadPage(currentPage);
     }
 
     private void DeleteProduct(Product product)
@@ -220,7 +249,15 @@
     private async Task HandleProductDeleted(Product deletedProduct)
     {
         // Refresh the products list to remove the deleted product
-        await LoadProducts();
+        // If we're on a page that might be empty after deletion, go to previous page
+        if (products?.Length == 1 && currentPage > 1)
+        {
+            await LoadPage(currentPage - 1);
+        }
+        else
+        {
+            await LoadPage(currentPage);
+        }
     }
 
     private void ToggleCategoryDropdown()
@@ -268,12 +305,12 @@
     private async Task HandleCategoryAdded(Category newCategory)
     {
         // Refresh the products list to show updated categories
-        await LoadProducts();
+        await LoadPage(currentPage);
     }
 
     private async Task HandleCategoryDeleted(CategorySummary deletedCategory)
     {
         // Refresh the products list to show updated categories
-        await LoadProducts();
+        await LoadPage(currentPage);
     }
 }

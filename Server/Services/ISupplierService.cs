@@ -11,5 +11,6 @@ namespace InventoryHubApp.Server.Services
         Task<bool> DeleteSupplierAsync(int supplierId);
         Task<IEnumerable<Supplier>> SearchSuppliersByNameAsync(string name);
         Task<IEnumerable<Supplier>> GetSuppliersByEmailAsync(string email);
+        Task<PaginationResponse<Supplier>> GetSuppliersPaginatedAsync(int pageNumber = 1, int pageSize = 6);
     }
 }

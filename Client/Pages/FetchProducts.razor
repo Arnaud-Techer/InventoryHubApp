@@ -5,13 +5,18 @@
 
 @page "/fetchproducts"
 
-<div class="products-page">
+<div class="products-page" @onclick="CloseDropdownIfOpen">
     <div class="page-header">
         <h2 class="page-title">
             <i class="fas fa-boxes"></i>
             Products Inventory
         </h2>
         <div class="page-actions">
+            <PaginationComponent CurrentPage="currentPage" 
+                                TotalPages="totalPages" 
+                                HasPreviousPage="hasPreviousPage" 
+                                HasNextPage="hasNextPage" 
+                                OnPageChanged="LoadPage" />
             <button class="btn btn-success" @onclick="RefreshProducts">
                 <i class="fas fa-sync-alt"></i>
                 Refresh
@@ -20,6 +25,26 @@
                 <i class="fas fa-plus"></i>
                 Add Product
             </button>
+            <div class="category-dropdown @(showCategoryDropdown ? "open" : "")">
+                <button class="btn btn-category dropdown-toggle" @onclick="ToggleCategoryDropdown" @onclick:stopPropagation="true">
+                    <i class="fas fa-list"></i>
+                    Categories
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                @if (showCategoryDropdown)
+                {
+                    <div class="dropdown-menu" @onclick:stopPropagation="true">
+                        <button class="dropdown-item" @onclick="AddNewCategory">
+                            <i class="fas fa-plus"></i>
+                            Add Category
+                        </button>
+                        <button class="dropdown-item" @onclick="DeleteCategory">
+                            <i class="fas fa-trash"></i>
+                            Delete Category
+                        </button>
+                    </div>
+                }
+            </div>
         </div>
     </div>
 
@@ -91,6 +116,14 @@
                     OnClose="CloseDeleteModal" 
                     OnProductDeleted="HandleProductDeleted" />
 
+<AddCategoryModal IsVisible="showAddCategoryModal" 
+                  OnClose="CloseAddCategoryModal" 
+                  OnCategoryAdded="HandleCategoryAdded" />
+
+<DeleteCategoryModal IsVisible="showDeleteCategoryModal" 
+                     OnClose="CloseDeleteCategoryModal" 
+                     OnCategoryDeleted="HandleCategoryDeleted" />
+
 @code {
     private Product[]? products;
     private bool isLoading = true;
@@ -98,15 +131,25 @@
     private bool showAddModal = false;
     private bool showEditModal = false;
     private bool showDeleteModal = false;
+    private bool showAddCategoryModal = false;
+    private bool showDeleteCategoryModal = false;
+    private bool showCategoryDropdown = false;
     private Product? selectedProduct;
     private Product? productToDelete;
+    
+    // Pagination properties
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private bool hasPreviousPage = false;
+    private bool hasNextPage = false;
+    private const int pageSize = 6;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProducts();
+        await LoadPage(1);
     }
 
-    private async Task LoadProducts()
+    private async Task LoadPage(int pageNumber)
     {
         isLoading = true;
         errorMessage = null;
@@ -114,7 +157,19 @@
 
         try
         {
-            products = await ApiService.GetProductsAsync();
+            var paginationResponse = await ApiService.GetProductsPaginatedAsync(pageNumber, pageSize);
+            if (paginationResponse != null)
+            {
+                products = paginationResponse.Items;
+                currentPage = paginationResponse.PageNumber;
+                totalPages = paginationResponse.TotalPages;
+                hasPreviousPage = paginationResponse.HasPreviousPage;
+                hasNextPage = paginationResponse.HasNextPage;
+            }
+            else
+            {
+                products = Array.Empty<Product>();
+            }
         }
         catch (Exception ex)
         {
@@ -127,6 +182,11 @@
             isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task LoadProducts()
+    {
+        await LoadPage(1);
     }
 
     private async Task RefreshProducts()
@@ -149,7 +209,7 @@
     private async Task HandleProductAdded(Product newProduct)
     {
         // Refresh the products list to include the new product
-        await LoadProducts();
+        await LoadPage(currentPage);
     }
 
     private void EditProduct(Product product)
@@ -169,7 +229,7 @@
     private async Task HandleProductUpdated(Product updatedProduct)
     {
         // Refresh the products list to show the updated product
-        await LoadProducts();
+        await LoadPage(currentPage);
     }
 
     private void DeleteProduct(Product product)
@@ -189,6 +249,68 @@
     private async Task HandleProductDeleted(Product deletedProduct)
     {
         // Refresh the products list to remove the deleted product
-        await LoadProducts();
+        // If we're on a page that might be empty after deletion, go to previous page
+        if (products?.Length == 1 && currentPage > 1)
+        {
+            await LoadPage(currentPage - 1);
+        }
+        else
+        {
+            await LoadPage(currentPage);
+        }
+    }
+
+    private void ToggleCategoryDropdown()
+    {
+        showCategoryDropdown = !showCategoryDropdown;
+        Console.WriteLine($"Dropdown state changed to: {showCategoryDropdown}");
+        StateHasChanged();
+    }
+
+    private void CloseDropdownIfOpen()
+    {
+        if (showCategoryDropdown)
+        {
+            showCategoryDropdown = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AddNewCategory()
+    {
+        showCategoryDropdown = false;
+        showAddCategoryModal = true;
+        StateHasChanged();
+    }
+
+    private void DeleteCategory()
+    {
+        showCategoryDropdown = false;
+        showDeleteCategoryModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseAddCategoryModal()
+    {
+        showAddCategoryModal = false;
+        StateHasChanged();
+    }
+
+    private void CloseDeleteCategoryModal()
+    {
+        showDeleteCategoryModal = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleCategoryAdded(Category newCategory)
+    {
+        // Refresh the products list to show updated categories
+        await LoadPage(currentPage);
+    }
+
+    private async Task HandleCategoryDeleted(CategorySummary deletedCategory)
+    {
+        // Refresh the products list to show updated categories
+        await LoadPage(currentPage);
     }
 }

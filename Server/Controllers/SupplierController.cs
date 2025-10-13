@@ -162,6 +162,26 @@ namespace InventoryHubApp.Server.Controllers
         }
 
         /// <summary>
+        /// Get suppliers with pagination
+        /// </summary>
+        [HttpGet("paginated")]
+        public async Task<ActionResult<PaginationResponse<Supplier>>> GetSuppliersPaginated([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 6)
+        {
+            if (pageNumber < 1)
+            {
+                return BadRequest("Page number must be greater than 0.");
+            }
+
+            if (pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest("Page size must be between 1 and 100.");
+            }
+
+            var result = await _supplierService.GetSuppliersPaginatedAsync(pageNumber, pageSize);
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Basic email validation helper method
         /// </summary>
         private static bool IsValidEmail(string email)

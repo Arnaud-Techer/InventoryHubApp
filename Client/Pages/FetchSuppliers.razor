@@ -18,6 +18,11 @@
             </p>
         </div>
         <div class="header-actions">
+            <PaginationComponent CurrentPage="currentPage" 
+                                TotalPages="totalPages" 
+                                HasPreviousPage="hasPreviousPage" 
+                                HasNextPage="hasNextPage" 
+                                OnPageChanged="LoadPage" />
             <button class="btn btn-primary" @onclick="AddNewSupplier">
                 <i class="fas fa-plus"></i>
                 Add Supplier
@@ -93,13 +98,20 @@
     private bool showAddModal = false;
     private bool showEditModal = false;
     private Supplier? selectedSupplier;
+    
+    // Pagination properties
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private bool hasPreviousPage = false;
+    private bool hasNextPage = false;
+    private const int pageSize = 6;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadSuppliers();
+        await LoadPage(1);
     }
 
-    private async Task LoadSuppliers()
+    private async Task LoadPage(int pageNumber)
     {
         isLoading = true;
         errorMessage = null;
@@ -107,17 +119,36 @@
 
         try
         {
-            suppliers = await ApiService.GetSuppliersAsync();
+            var paginationResponse = await ApiService.GetSuppliersPaginatedAsync(pageNumber, pageSize);
+            if (paginationResponse != null)
+            {
+                suppliers = paginationResponse.Items;
+                currentPage = paginationResponse.PageNumber;
+                totalPages = paginationResponse.TotalPages;
+                hasPreviousPage = paginationResponse.HasPreviousPage;
+                hasNextPage = paginationResponse.HasNextPage;
+            }
+            else
+            {
+                suppliers = Array.Empty<Supplier>();
+            }
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+            Console.Error.WriteLine($"Error fetching suppliers: {ex.Message}");
+            suppliers = Array.Empty<Supplier>();
         }
         finally
         {
             isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task LoadSuppliers()
+    {
+        await LoadPage(1);
     }
 
     private void AddNewSupplier()
@@ -135,7 +166,7 @@
     private async Task HandleSupplierAdded(Supplier newSupplier)
     {
         // Refresh the suppliers list to include the new supplier
-        await LoadSuppliers();
+        await LoadPage(currentPage);
     }
 
     private void EditSupplier(Supplier supplier)
@@ -155,7 +186,7 @@
     private async Task HandleSupplierUpdated(Supplier updatedSupplier)
     {
         // Refresh the suppliers list to show the updated supplier
-        await LoadSuppliers();
+        await LoadPage(currentPage);
     }
 
     private void DeleteSupplier(Supplier supplier)

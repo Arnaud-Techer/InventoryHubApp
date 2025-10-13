@@ -13,6 +13,9 @@ builder.Services.AddDbContext<InventoryDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? 
     "Data Source=inventory.db"));
 
+// Add Memory Cache
+builder.Services.AddMemoryCache();
+
 // Register custom services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();

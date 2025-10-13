@@ -12,5 +12,6 @@ namespace InventoryHubApp.Server.Services
         Task<IEnumerable<Product>> GetProductsByCategoryAsync(int categoryId);
         Task<IEnumerable<Product>> GetProductsBySupplierAsync(int supplierId);
         Task<IEnumerable<Product>> GetLowStockProductsAsync(int threshold = 10);
+        Task<PaginationResponse<Product>> GetProductsPaginatedAsync(int pageNumber = 1, int pageSize = 6);
     }
 }

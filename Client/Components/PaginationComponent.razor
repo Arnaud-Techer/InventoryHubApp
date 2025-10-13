@@ -1,0 +1,29 @@
+@using InventoryHubApp.Shared.Models
+
+<div class="pagination-container">
+    <div class="pagination-controls">
+        <button class="btn btn-outline-primary pagination-btn" 
+                @onclick="() => OnPageChanged.InvokeAsync(CurrentPage - 1)" 
+                disabled="@(!HasPreviousPage)">
+            <i class="fas fa-chevron-left"></i> Previous
+        </button>
+        
+        <span class="pagination-info">
+            Page @CurrentPage of @TotalPages
+        </span>
+        
+        <button class="btn btn-outline-primary pagination-btn" 
+                @onclick="() => OnPageChanged.InvokeAsync(CurrentPage + 1)" 
+                disabled="@(!HasNextPage)">
+            Next <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+    [Parameter] public bool HasPreviousPage { get; set; } = false;
+    [Parameter] public bool HasNextPage { get; set; } = false;
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+}

@@ -1,16 +1,28 @@
 using InventoryHubApp.Shared.Models;
 using InventoryHubApp.Server.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace InventoryHubApp.Server.Services
 {
     public class SupplierService : ISupplierService
     {
         private readonly InventoryDbContext _context;
+        private readonly IMemoryCache _cache;
 
-        public SupplierService(InventoryDbContext context)
+        // Cache configuration
+        private const string CACHE_KEY_FIRST_PAGE_SUPPLIERS = "first_page_suppliers";
+        private const int CACHE_EXPIRATION_MINUTES = 30;
+
+        public SupplierService(InventoryDbContext context, IMemoryCache cache)
         {
             _context = context;
+            _cache = cache;
+        }
+
+        private void InvalidateFirstPageCache()
+        {
+            _cache.Remove(CACHE_KEY_FIRST_PAGE_SUPPLIERS);
         }
 
         public async Task<IEnumerable<Supplier>> GetAllSuppliersAsync()
@@ -56,6 +68,10 @@ namespace InventoryHubApp.Server.Services
             }
 
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache after creating a new supplier
+            InvalidateFirstPageCache();
+            
             return newSupplier;
         }
 
@@ -90,6 +106,10 @@ namespace InventoryHubApp.Server.Services
             }
 
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache after updating a supplier
+            InvalidateFirstPageCache();
+            
             return existingSupplier;
         }
 
@@ -101,6 +121,10 @@ namespace InventoryHubApp.Server.Services
 
             _context.Suppliers.Remove(supplier);
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache after deleting a supplier
+            InvalidateFirstPageCache();
+            
             return true;
         }
 
@@ -120,6 +144,55 @@ namespace InventoryHubApp.Server.Services
                 .Where(s => s.SupplierEmail != null && 
                            s.SupplierEmail.Equals(email))
                 .ToListAsync();
+        }
+
+        public async Task<PaginationResponse<Supplier>> GetSuppliersPaginatedAsync(int pageNumber = 1, int pageSize = 6)
+        {
+            // Check if this is page 1 with default page size (cache scenario)
+            if (pageNumber == 1 && pageSize == 6)
+            {
+                // Try to get from cache first
+                if (_cache.TryGetValue(CACHE_KEY_FIRST_PAGE_SUPPLIERS, out PaginationResponse<Supplier>? cachedResponse))
+                {
+                    return cachedResponse;
+                }
+            }
+
+            // Fetch from database
+            var totalCount = await _context.Suppliers.CountAsync();
+            var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+            
+            var suppliers = await _context.Suppliers
+                .Include(s => s.Products)
+                .OrderBy(s => s.SupplierId)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToArrayAsync();
+
+            var response = new PaginationResponse<Supplier>
+            {
+                Items = suppliers,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                HasNextPage = pageNumber < totalPages,
+                HasPreviousPage = pageNumber > 1
+            };
+
+            // Cache the first page if it's page 1 with default page size
+            if (pageNumber == 1 && pageSize == 6)
+            {
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CACHE_EXPIRATION_MINUTES),
+                    Priority = CacheItemPriority.Normal
+                };
+
+                _cache.Set(CACHE_KEY_FIRST_PAGE_SUPPLIERS, response, cacheOptions);
+            }
+
+            return response;
         }
     }
 }

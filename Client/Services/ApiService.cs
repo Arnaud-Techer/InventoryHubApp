@@ -11,12 +11,17 @@ public class ApiOptions
 public interface IApiService
 {
     public Task<Product[]?> GetProductsAsync();
+    public Task<PaginationResponse<Product>?> GetProductsPaginatedAsync(int pageNumber = 1, int pageSize = 6);
     public Task<Product?> GetProductByIdAsync(int id);
     public Task<Product?> CreateProductAsync(Product product);
     public Task<Product?> UpdateProductAsync(int id, Product product);
     public Task<bool> DeleteProductAsync(int id);
     public Task<Category[]?> GetCategoriesAsync();
+    public Task<CategorySummary[]?> GetCategorySummariesAsync();
+    public Task<Category?> CreateCategoryAsync(Category category);
+    public Task<bool> DeleteCategoryAsync(int id);
     public Task<Supplier[]?> GetSuppliersAsync();
+    public Task<PaginationResponse<Supplier>?> GetSuppliersPaginatedAsync(int pageNumber = 1, int pageSize = 6);
     public Task<Supplier?> CreateSupplierAsync(Supplier supplier);
     public Task<Supplier?> UpdateSupplierAsync(int id, Supplier supplier);
 }
@@ -38,6 +43,22 @@ public class ApiService : IApiService
         catch (HttpRequestException ex)
         {
             throw new Exception($"Failed to connect to the API. Please ensure the server is running. Error: {ex.Message}");
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new Exception($"Request timed out. Please check your connection and try again. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<PaginationResponse<Product>?> GetProductsPaginatedAsync(int pageNumber = 1, int pageSize = 6)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<PaginationResponse<Product>>($"/api/product/paginated?pageNumber={pageNumber}&pageSize={pageSize}");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to fetch paginated products. Error: {ex.Message}");
         }
         catch (TaskCanceledException ex)
         {
@@ -88,6 +109,48 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<CategorySummary[]?> GetCategorySummariesAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<CategorySummary[]>("/api/category/with-counts");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to fetch category summaries. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<Category?> CreateCategoryAsync(Category category)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/category", category);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<Category>();
+            }
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to create category. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<bool> DeleteCategoryAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"/api/category/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to delete category. Error: {ex.Message}");
+        }
+    }
+
     public async Task<Supplier[]?> GetSuppliersAsync()
     {
         try
@@ -97,6 +160,22 @@ public class ApiService : IApiService
         catch (HttpRequestException ex)
         {
             throw new Exception($"Failed to fetch suppliers. Error: {ex.Message}");
+        }
+    }
+
+    public async Task<PaginationResponse<Supplier>?> GetSuppliersPaginatedAsync(int pageNumber = 1, int pageSize = 6)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<PaginationResponse<Supplier>>($"/api/supplier/paginated?pageNumber={pageNumber}&pageSize={pageSize}");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Failed to fetch paginated suppliers. Error: {ex.Message}");
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new Exception($"Request timed out. Please check your connection and try again. Error: {ex.Message}");
         }
     }
 

@@ -1,16 +1,26 @@
 using InventoryHubApp.Shared.Models;
 using InventoryHubApp.Server.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace InventoryHubApp.Server.Services
 {
     public class ProductService : IProductService
     {
         private readonly InventoryDbContext _context;
+        private readonly IMemoryCache _cache;
+        private const string CACHE_KEY_FIRST_PAGE_PRODUCTS = "first_page_products";
+        private const int CACHE_EXPIRATION_MINUTES = 30;
 
-        public ProductService(InventoryDbContext context)
+        public ProductService(InventoryDbContext context, IMemoryCache cache)
         {
             _context = context;
+            _cache = cache;
+        }
+
+        private void InvalidateFirstPageCache()
+        {
+            _cache.Remove(CACHE_KEY_FIRST_PAGE_PRODUCTS);
         }
 
         public async Task<IEnumerable<Product>> GetAllProductsAsync()
@@ -70,6 +80,10 @@ namespace InventoryHubApp.Server.Services
             }
 
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache since we added a new product
+            InvalidateFirstPageCache();
+            
             return newProduct;
         }
 
@@ -119,6 +133,10 @@ namespace InventoryHubApp.Server.Services
             }
 
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache since we updated a product
+            InvalidateFirstPageCache();
+            
             return existingProduct;
         }
 
@@ -130,6 +148,10 @@ namespace InventoryHubApp.Server.Services
 
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache since we deleted a product
+            InvalidateFirstPageCache();
+            
             return true;
         }
 
@@ -158,6 +180,56 @@ namespace InventoryHubApp.Server.Services
                 .Include(p => p.Suppliers)
                 .Where(p => p.Stock <= threshold)
                 .ToListAsync();
+        }
+
+        public async Task<PaginationResponse<Product>> GetProductsPaginatedAsync(int pageNumber = 1, int pageSize = 6)
+        {
+            // Check if this is page 1 with default page size (cache scenario)
+            if (pageNumber == 1 && pageSize == 6)
+            {
+                // Try to get from cache first
+                if (_cache.TryGetValue(CACHE_KEY_FIRST_PAGE_PRODUCTS, out PaginationResponse<Product>? cachedResponse))
+                {
+                    return cachedResponse;
+                }
+            }
+
+            // Fetch from database
+            var totalCount = await _context.Products.CountAsync();
+            var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+            
+            var products = await _context.Products
+                .Include(p => p.Categories)
+                .Include(p => p.Suppliers)
+                .OrderBy(p => p.ProductId)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToArrayAsync();
+
+            var response = new PaginationResponse<Product>
+            {
+                Items = products,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                HasNextPage = pageNumber < totalPages,
+                HasPreviousPage = pageNumber > 1
+            };
+
+            // Cache the first page if it's page 1 with default page size
+            if (pageNumber == 1 && pageSize == 6)
+            {
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CACHE_EXPIRATION_MINUTES),
+                    Priority = CacheItemPriority.Normal
+                };
+
+                _cache.Set(CACHE_KEY_FIRST_PAGE_PRODUCTS, response, cacheOptions);
+            }
+
+            return response;
         }
     }
 }
